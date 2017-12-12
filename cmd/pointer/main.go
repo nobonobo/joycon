@@ -149,6 +149,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
+	defer j.Close()
 	jc := &Joycon{j}
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
@@ -156,7 +157,7 @@ func main() {
 	for {
 		select {
 		case <-sig:
-			jc.Close()
+			return
 		case s, ok := <-jc.State():
 			if !ok {
 				return

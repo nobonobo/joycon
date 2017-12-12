@@ -34,7 +34,6 @@ var (
 type Joycon struct {
 	closeOnce       sync.Once
 	device          hid.Device
-	done            chan struct{}
 	rumble, command chan []byte
 	report          chan []byte
 	state           chan State
@@ -49,7 +48,6 @@ type Joycon struct {
 // NewJoycon ...
 func NewJoycon(devicePath string) (*Joycon, error) {
 	jc := &Joycon{
-		done:    make(chan struct{}),
 		rumble:  make(chan []byte, 16),
 		command: make(chan []byte, 16),
 		report:  make(chan []byte, 16),
@@ -73,7 +71,6 @@ func NewJoycon(devicePath string) (*Joycon, error) {
 // Close ...
 func (jc *Joycon) Close() {
 	jc.closeOnce.Do(func() {
-		close(jc.done)
 		close(jc.rumble)
 		close(jc.command)
 		for range jc.state {
