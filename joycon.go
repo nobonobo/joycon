@@ -5,7 +5,6 @@ package joycon
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math"
 	"sync"
 
@@ -199,7 +198,6 @@ func (jc *Joycon) run() {
 		}
 		if !bytes.Equal(data, bytes.Repeat([]byte{0xff}, 9)) {
 			jc.leftStick.UnmarshalBinary(data)
-			log.Printf("UserLeftStick: %v", jc.leftStick)
 		} else {
 			data, err = jc.ReadSPI(0x603d, 9)
 			if err != nil {
@@ -208,7 +206,6 @@ func (jc *Joycon) run() {
 			}
 			if !bytes.Equal(data, bytes.Repeat([]byte{0xff}, 9)) {
 				jc.leftStick.UnmarshalBinary(data)
-				log.Printf("SysLeftStick: %v", jc.leftStick)
 
 			}
 		}
@@ -225,7 +222,6 @@ func (jc *Joycon) run() {
 			d = append(d, data[0:3]...)
 			d = append(d, data[3:6]...)
 			jc.rightStick.UnmarshalBinary(d)
-			log.Printf("UserRightStick: %v", jc.rightStick)
 		} else {
 			data, err = jc.ReadSPI(0x6046, 9)
 			if err != nil {
@@ -238,38 +234,33 @@ func (jc *Joycon) run() {
 				d = append(d, data[0:3]...)
 				d = append(d, data[3:6]...)
 				jc.rightStick.UnmarshalBinary(d)
-				log.Printf("SysRightStick: %v", jc.rightStick)
 			}
 		}
 	}
+	// LeftStick Deadzone
 	data, err = jc.ReadSPI(0x6086, 16)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
-	log.Printf("LeftDeadzone: %X", data)
-
+	// RightStick Deadzone
 	data, err = jc.ReadSPI(0x6098, 16)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
-	log.Printf("RightDeadZone: %X", data)
-
+	// Gyro Parameters (user)
 	data, err = jc.ReadSPI(0x8034, 10)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
-	log.Printf("UserGyro: %X", data)
-
+	// Gyro Parameters (sys)
 	data, err = jc.ReadSPI(0x6029, 10)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
-	log.Printf("SysGyro: %X", data)
-
 	for _, seq := range connectSeq {
 		_, err := jc.subcommand(nil, seq)
 		if err != nil {
@@ -312,9 +303,7 @@ func (jc *Joycon) run() {
 		}
 		switch rep[0] {
 		case 0x3f:
-			log.Printf("0x%x: %X\n", rep[0], rep[1:])
 		case 0x31, 0x32, 0x33:
-			log.Printf("0x%x: %X\n", rep[0], rep[1:])
 		case 0x21:
 			s := &State{}
 			if err := s.UnmarshalBinary(rep); err != nil {

@@ -2,14 +2,24 @@
 
 Nintendo Switch's Joycon Device access library(via bluetooth only)
 
-## dependencies
+## Feature
 
-- github.com/flynn/hid
-- github.com/shibukawa/gotomation (optional)
+- supported deveces: Joycon(L/R), Pro-Controller
+- get: Digial Buttons state
+- get: Analog Sticks state
+- set: Raw Vibration data
+- calibration support for analog stick.
 
-## usage
+## Dependencies
+
+- go get -u github.com/flynn/hid
+- go get -u github.com/shibukawa/gotomation `optional`
+
+## Usage
 
 ```go
+package main
+
 import "github.com/nobonobo/joycon"
 
 func main() {
@@ -28,5 +38,18 @@ func main() {
     fmt.Println(s.Buttons)  // Button bits
     fmt.Println(s.LeftAdj)  // Left Analog Stick State
     fmt.Println(s.RightAdj) // Right Analog Stick State
+    a := <-jc.Sensor()
+    fmt.Println(a.Accel) // Acceleration Sensor State
+    fmt.Println(a.Gyro)  // Gyro Sensor State
+
+    jc.Close()
 }
 ```
+## TODO
+
+- [ ] Deadzone parameter read from SPI memory. 
+- [ ] Rich Vibration support.
+- [ ] Set Player LED.
+- [ ] Set HomeButton LED.
+- [ ] Low power mode support.
+- [ ] IR sensor capture.
