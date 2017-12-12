@@ -94,7 +94,13 @@ func (jc *Joycon) Sensor() <-chan Sensor {
 
 // Rumble ...
 func (jc *Joycon) Rumble(b []byte) {
-	jc.rumble <- b
+	for len(b) >= 8 {
+		jc.rumble <- b[:8]
+		b = b[8:]
+	}
+	if len(b) > 0 {
+		jc.rumble <- b
+	}
 }
 
 // LeftStickCalibration ...
@@ -108,8 +114,7 @@ func (jc *Joycon) RightStickCalibration() CalibInfo {
 }
 
 func (jc *Joycon) subcommand(rumble, cmd []byte) ([]byte, error) {
-	//<-jc.ticker.C
-	r := make([]byte, 8)
+	r := []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 	copy(r, rumble)
 	buf := make([]byte, 0, 24)
 	buf = append(buf, []byte{0x01, jc.count}...)

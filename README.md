@@ -21,6 +21,11 @@ https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering
 
 ## Usage
 
+In advance, you perform Bluetooth pairing for Joycon.
+(Joycon must be connected before execute below code.)
+
+Note: When Joycon is fitted to the main body, BT sessions are overwritten, so when you connect to PC later, you need to redo pairing.
+
 ```go
 package main
 
