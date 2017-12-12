@@ -1,7 +1,5 @@
 package main
 
-// Ref: https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering/blob/bd12f564a9281ba61ab7b7782dc0255c642cb5e4/bluetooth_hid_subcommands_notes.md
-
 import (
 	"log"
 	"os"

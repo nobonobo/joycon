@@ -2,6 +2,10 @@
 
 Nintendo Switch's Joycon Device access library(via bluetooth only)
 
+## Reverse engineering info
+
+https://github.com/dekuNukem/Nintendo_Switch_Reverse_Engineering
+
 ## Feature
 
 - supported deveces: Joycon(L/R), Pro-Controller
