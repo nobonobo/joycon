@@ -92,22 +92,34 @@ type Sensor struct {
 	Accel Vec3
 }
 
-// SensorTri ...
-type SensorTri [3]Sensor
+// Sensors ...
+type Sensors [3]Sensor
 
 // UnmarshalBinary ...
-func (s *SensorTri) UnmarshalBinary(b []byte) error {
+func (s *Sensors) UnmarshalBinary(b []byte) error {
 	if len(b) < 49 {
 		return fmt.Errorf("invalid bytes length")
 	}
 	for n := 0; n < 3; n++ {
 		s[n].Tick = b[1] - byte(2-n)
-		s[n].Accel.X = AccelK * float32(int16(binary.LittleEndian.Uint16(b[13+n*12:15+n*12])))
-		s[n].Accel.Y = AccelK * float32(int16(binary.LittleEndian.Uint16(b[15+n*12:17+n*12])))
-		s[n].Accel.Z = AccelK * float32(int16(binary.LittleEndian.Uint16(b[17+n*12:19+n*12])))
-		s[n].Gyro.X = GyroK * float32(int16(binary.LittleEndian.Uint16(b[19+n*12:21+n*12])))
-		s[n].Gyro.Y = GyroK * float32(int16(binary.LittleEndian.Uint16(b[21+n*12:23+n*12])))
-		s[n].Gyro.Z = GyroK * float32(int16(binary.LittleEndian.Uint16(b[23+n*12:25+n*12])))
+		s[n].Accel.X = AccelK * float32(int16(
+			binary.LittleEndian.Uint16(b[13+n*12:15+n*12]),
+		))
+		s[n].Accel.Y = AccelK * float32(int16(
+			binary.LittleEndian.Uint16(b[15+n*12:17+n*12]),
+		))
+		s[n].Accel.Z = AccelK * float32(int16(
+			binary.LittleEndian.Uint16(b[17+n*12:19+n*12]),
+		))
+		s[n].Gyro.X = GyroK * float32(int16(
+			binary.LittleEndian.Uint16(b[19+n*12:21+n*12]),
+		))
+		s[n].Gyro.Y = GyroK * float32(int16(
+			binary.LittleEndian.Uint16(b[21+n*12:23+n*12]),
+		))
+		s[n].Gyro.Z = GyroK * float32(int16(
+			binary.LittleEndian.Uint16(b[23+n*12:25+n*12]),
+		))
 	}
 	return nil
 }

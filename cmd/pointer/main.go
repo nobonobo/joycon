@@ -29,6 +29,7 @@ func init() {
 
 // Joycon ...
 type Joycon struct {
+	dx, dy int
 	*joycon.Joycon
 }
 
@@ -126,12 +127,23 @@ func (jc *Joycon) stateHandle(s joycon.State) {
 	}
 }
 
+func (jc *Joycon) apply() {
+	if jc.dx != 0 || jc.dy != 0 {
+		x, y := mouse.GetPosition()
+		mouse.MoveQuickly(x+jc.dx, y+jc.dy)
+		jc.dx = 0
+		jc.dy = 0
+	}
+}
+
 func (jc *Joycon) sensorHandle(s joycon.Sensor) {
-	x, y := mouse.GetPosition()
-	dx := x + int(s.Gyro.Z*200)
-	dy := y - int(s.Gyro.Y*200)
-	if x != dx || y != dy {
-		mouse.Move(dx, dy, 5*time.Millisecond)
+	if jc.IsLeft() || jc.IsProCon() {
+		jc.dx -= int(s.Gyro.Z * 200)
+		jc.dy += int(s.Gyro.Y * 200)
+	}
+	if jc.IsRight() {
+		jc.dx += int(s.Gyro.Z * 200)
+		jc.dy -= int(s.Gyro.Y * 200)
 	}
 }
 
@@ -150,7 +162,7 @@ func main() {
 		log.Fatalln(err)
 	}
 	defer j.Close()
-	jc := &Joycon{j}
+	jc := &Joycon{Joycon: j}
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 
@@ -163,6 +175,7 @@ func main() {
 				return
 			}
 			jc.stateHandle(s)
+			jc.apply()
 		case s, ok := <-jc.Sensor():
 			if !ok {
 				return
