@@ -5,7 +5,6 @@ package joycon
 import (
 	"bytes"
 	"fmt"
-	"log"
 	"math"
 	"sync"
 	"time"
@@ -52,7 +51,7 @@ type Joycon struct {
 // NewJoycon ...
 func NewJoycon(devicePath string) (*Joycon, error) {
 	jc := &Joycon{
-		rumble: make(chan []byte, 16),
+		rumble: make(chan []byte, 200), // max 1sec
 		report: make(chan []byte, 16),
 		state:  make(chan State, 16),
 		sensor: make(chan Sensor, 16),
@@ -98,9 +97,19 @@ func (jc *Joycon) Rumble(b []byte) {
 		jc.rumble <- b[:8]
 		b = b[8:]
 	}
-	if len(b) > 0 {
+	// truncate the remainder
+}
+
+// SendRumble ...
+func (jc *Joycon) SendRumble(rs ...RumbleSet) error {
+	for _, r := range rs {
+		b, err := r.MarshalBinary()
+		if err != nil {
+			return err
+		}
 		jc.rumble <- b
 	}
+	return nil
 }
 
 func (jc *Joycon) IsLeft() bool {
@@ -141,7 +150,6 @@ func (jc *Joycon) subcommand(rumble, cmd []byte) error {
 	copy(buf[2:10], rumble)
 	copy(buf[10:], cmd)
 	jc.count = (jc.count + 1) & 15
-	//log.Printf("send: %X", buf)
 	return jc.device.Write(buf)
 }
 
@@ -205,7 +213,6 @@ func (jc *Joycon) receive() {
 						s.RightAdj = jc.calibration(jc.rightStick, s.Right)
 					}
 				} else {
-					log.Println(err)
 					s.Err = err
 				}
 				select {
@@ -213,7 +220,6 @@ func (jc *Joycon) receive() {
 				default:
 				}
 			default:
-				log.Printf("unknown: %X", rep)
 			}
 			jc.report <- rep
 		}
@@ -331,17 +337,14 @@ func (jc *Joycon) run() {
 	defer func() {
 		for _, seq := range disconnectSeq {
 			if err := jc.subcommand(nil, seq); err != nil {
-				log.Println(err)
 				jc.state <- State{Err: err}
 				return
 			}
 			if _, err := jc.reply(); err != nil {
-				log.Println(err)
 				jc.state <- State{Err: err}
 				return
 			}
 		}
-		log.Println("disconnect:", jc.Name())
 	}()
 	// loop
 	n := 0
