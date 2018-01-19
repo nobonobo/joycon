@@ -15,15 +15,16 @@ import (
 )
 
 const (
-	Power          = 127
-	KEY_LEFT  uint = 65361
-	KEY_UP    uint = 65362
-	KEY_RIGHT uint = 65363
-	KEY_DOWN  uint = 65364
+	LeftPower       = 115
+	RightPower      = 127
+	KEY_LEFT   uint = 65361
+	KEY_UP     uint = 65362
+	KEY_RIGHT  uint = 65363
+	KEY_DOWN   uint = 65364
 )
 
 var (
-	vibration = []joycon.RumbleSet{
+	vibrationForLeft = []joycon.RumbleSet{
 		/*
 			{ // neutral
 				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil
@@ -31,24 +32,44 @@ var (
 			},
 		*/
 		{
-			{HiFreq: 64, HiAmp: Power, LoFreq: 64, LoAmp: Power}, // HiCoil
-			{HiFreq: 64, HiAmp: Power, LoFreq: 64, LoAmp: Power}, // LoCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // LoCoil
 		},
 		{
-			{HiFreq: 64, HiAmp: Power, LoFreq: 64, LoAmp: Power}, // HiCoil
-			{HiFreq: 64, HiAmp: Power, LoFreq: 65, LoAmp: Power}, // LoCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
 		},
 		{
-			{HiFreq: 64, HiAmp: Power, LoFreq: 64, LoAmp: Power}, // HiCoil
-			{HiFreq: 64, HiAmp: Power, LoFreq: 65, LoAmp: Power}, // LoCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
 		},
 		{
-			{HiFreq: 64, HiAmp: Power, LoFreq: 64, LoAmp: Power}, // HiCoil
-			{HiFreq: 64, HiAmp: Power, LoFreq: 65, LoAmp: Power}, // LoCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
+			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
+		},
+	}
+	vibrationForRight = []joycon.RumbleSet{
+		/*
+			{ // neutral
+				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil
+				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // LoCoil
+			},
+		*/
+		{
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // LoCoil
 		},
 		{
-			{HiFreq: 64, HiAmp: Power, LoFreq: 64, LoAmp: Power}, // HiCoil
-			{HiFreq: 64, HiAmp: Power, LoFreq: 65, LoAmp: Power}, // LoCoil
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
+		},
+		{
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
+		},
+		{
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
+			{HiFreq: 64, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
 		},
 	}
 )
@@ -180,17 +201,17 @@ func main() {
 		rightOn = false
 	})
 	go func() {
-		t := time.NewTicker(40 * time.Millisecond)
+		t := time.NewTicker(5 * time.Millisecond)
 		for {
 			select {
 			case <-done:
 				return
 			case <-t.C:
 				if leftOn {
-					jcs[0].SendRumble(vibration...)
+					jcs[0].SendRumble(vibrationForLeft...)
 				}
 				if rightOn {
-					jcs[1].SendRumble(vibration...)
+					jcs[1].SendRumble(vibrationForRight...)
 				}
 			}
 		}
@@ -198,6 +219,7 @@ func main() {
 
 	win.SetDefaultSize(320, 200)
 	win.Connect("destroy", gtk.MainQuit)
+	win.Present()
 	win.ShowAll()
 	gtk.Main()
 }

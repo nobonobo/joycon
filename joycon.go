@@ -51,7 +51,7 @@ type Joycon struct {
 // NewJoycon ...
 func NewJoycon(devicePath string) (*Joycon, error) {
 	jc := &Joycon{
-		rumble: make(chan []byte, 200), // max 1sec
+		rumble: make(chan []byte, 3),
 		report: make(chan []byte, 16),
 		state:  make(chan State, 16),
 		sensor: make(chan Sensor, 16),
