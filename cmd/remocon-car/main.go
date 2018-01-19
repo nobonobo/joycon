@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	LeftPower       = 115
+	LeftPower       = 127
 	RightPower      = 127
 	KEY_LEFT   uint = 65361
 	KEY_UP     uint = 65362
@@ -26,69 +26,42 @@ const (
 var (
 	vibrationForLeft = []joycon.RumbleSet{
 		/*
-			{ // neutral
-				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil
-				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // LoCoil
+			{
+				{HiFreq: 62, HiAmp: LeftPower, LoFreq: 62, LoAmp: LeftPower}, // HiCoil
+				{HiFreq: 66, HiAmp: LeftPower, LoFreq: 66, LoAmp: LeftPower}, // LoCoil
+			},
+			{
+				{HiFreq: 63, HiAmp: LeftPower, LoFreq: 63, LoAmp: LeftPower}, // HiCoil
+				{HiFreq: 65, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
 			},
 		*/
 		{
 			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
 			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // LoCoil
 		},
-		{
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
-		},
-		{
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
-		},
-		{
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
-		},
 	}
 	vibrationForRight = []joycon.RumbleSet{
 		/*
-			{ // neutral
-				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil
-				{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // LoCoil
+			{
+				{HiFreq: 62, HiAmp: RightPower, LoFreq: 62, LoAmp: RightPower}, // HiCoil
+				{HiFreq: 66, HiAmp: RightPower, LoFreq: 66, LoAmp: RightPower}, // LoCoil
+			},
+			{
+				{HiFreq: 63, HiAmp: RightPower, LoFreq: 63, LoAmp: RightPower}, // HiCoil
+				{HiFreq: 65, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
 			},
 		*/
 		{
 			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
 			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // LoCoil
 		},
-		{
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
-		},
-		{
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
-		},
-		{
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
-		},
 	}
 )
-
-func calc(v float32) int {
-	r := 500 - int(500*v)
-	if r < 0 {
-		r = 0
-	}
-	if r > 999 {
-		r = 999
-	}
-	return r
-}
 
 func main() {
 	runtime.LockOSThread()
 	defer runtime.UnlockOSThread()
-	log.SetFlags(log.Lmicroseconds)
+	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	devices, err := joycon.Search()
 	if err != nil {
 		log.Fatalln(err)
@@ -102,9 +75,10 @@ func main() {
 		if err != nil {
 			log.Fatalln(err)
 		}
+		log.Println(dev.Path, jc.Name())
 		jcs = append(jcs, jc)
 	}
-	if jcs[0].IsRight() {
+	if jcs[0].Name() == "Joy-Con (R)" {
 		jcs[0], jcs[1] = jcs[1], jcs[0]
 	}
 	defer func() {
@@ -165,6 +139,7 @@ func main() {
 	win.Add(box)
 
 	leftOn, rightOn := false, false
+	pressed := false
 	win.Connect("key-press-event", func(win *gtk.Window, ev *gdk.Event) {
 		keyEvent := &gdk.EventKey{ev}
 		switch keyEvent.KeyVal() {
@@ -172,6 +147,11 @@ func main() {
 			leftOn = true
 		case KEY_RIGHT:
 			rightOn = true
+		case KEY_UP:
+			if !pressed {
+				pressed = true
+				log.Println(jcs[0].Stats(), jcs[1].Stats())
+			}
 		}
 	})
 	win.Connect("key-release-event", func(win *gtk.Window, ev *gdk.Event) {
@@ -181,6 +161,8 @@ func main() {
 			leftOn = false
 		case KEY_RIGHT:
 			rightOn = false
+		case KEY_UP:
+			pressed = false
 		}
 	})
 
@@ -201,7 +183,8 @@ func main() {
 		rightOn = false
 	})
 	go func() {
-		t := time.NewTicker(5 * time.Millisecond)
+		d := 1 * time.Millisecond
+		t := time.NewTimer(d)
 		for {
 			select {
 			case <-done:
@@ -213,6 +196,7 @@ func main() {
 				if rightOn {
 					jcs[1].SendRumble(vibrationForRight...)
 				}
+				t.Reset(d)
 			}
 		}
 	}()

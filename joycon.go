@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"math"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/flynn/hid"
@@ -31,6 +32,13 @@ var (
 	}
 )
 
+// Stats ...
+type Stats struct {
+	RumbleCount uint64
+	SensorCount uint64
+	StateCount  uint64
+}
+
 // Joycon ...
 type Joycon struct {
 	info        *hid.DeviceInfo
@@ -46,6 +54,7 @@ type Joycon struct {
 	rightEnable bool
 	leftStick   CalibInfo
 	rightStick  CalibInfo
+	stats       Stats
 }
 
 // NewJoycon ...
@@ -112,14 +121,17 @@ func (jc *Joycon) SendRumble(rs ...RumbleSet) error {
 	return nil
 }
 
+// IsLeft ...
 func (jc *Joycon) IsLeft() bool {
 	return jc.leftEnable && !jc.rightEnable
 }
 
+// IsRight ...
 func (jc *Joycon) IsRight() bool {
 	return !jc.leftEnable && jc.rightEnable
 }
 
+// IsProCon ...
 func (jc *Joycon) IsProCon() bool {
 	return jc.leftEnable && jc.rightEnable
 }
@@ -137,6 +149,15 @@ func (jc *Joycon) RightStickCalibration() CalibInfo {
 // Name ...
 func (jc *Joycon) Name() string {
 	return jc.info.Product
+}
+
+// Stats ...
+func (jc *Joycon) Stats() Stats {
+	return Stats{
+		RumbleCount: atomic.LoadUint64(&jc.stats.RumbleCount),
+		SensorCount: atomic.LoadUint64(&jc.stats.SensorCount),
+		StateCount:  atomic.LoadUint64(&jc.stats.StateCount),
+	}
 }
 
 func (jc *Joycon) subcommand(rumble, cmd []byte) error {
@@ -194,6 +215,7 @@ func (jc *Joycon) receive() {
 				if err := s.UnmarshalBinary(rep); err != nil {
 					return
 				}
+				atomic.AddUint64(&jc.stats.SensorCount, 1)
 				for n := 0; n < 3; n++ {
 					select {
 					case jc.sensor <- s[n]:
@@ -217,6 +239,7 @@ func (jc *Joycon) receive() {
 				}
 				select {
 				case jc.state <- *s:
+					atomic.AddUint64(&jc.stats.StateCount, 1)
 				default:
 				}
 			default:
@@ -358,6 +381,7 @@ func (jc *Joycon) run() {
 			if !ok {
 				return
 			}
+			atomic.AddUint64(&jc.stats.RumbleCount, 1)
 			r = v
 			if n != 0 {
 				if err := jc.subcommand(r, nil); err != nil {
