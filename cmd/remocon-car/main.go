@@ -25,12 +25,14 @@ const (
 
 func genRumble() func() []joycon.RumbleSet {
 	return func() []joycon.RumbleSet {
-		return []joycon.RumbleSet{
-			{
+		res := make([]joycon.RumbleSet, 0, 3)
+		for i := 0; i < 1; i++ {
+			res = append(res, joycon.RumbleSet{
 				{HiFreq: Freq, HiAmp: Power, LoFreq: Freq, LoAmp: Power}, // HiCoil
 				{HiFreq: Freq, HiAmp: Power, LoFreq: Freq, LoAmp: Power}, // LoCoil
-			},
+			})
 		}
+		return res
 	}
 }
 
@@ -170,7 +172,7 @@ func main() {
 	leftGen := genRumble()
 	rightGen := genRumble()
 	go func() {
-		d := (15) * time.Millisecond
+		d := (5) * time.Millisecond
 		//t := time.NewTimer(d)
 		t := time.NewTicker(d)
 		t2 := time.NewTicker(1 * time.Second)
@@ -187,11 +189,13 @@ func main() {
 				} else {
 					jcs[0].SendRumble(rumbleOff...)
 				}
+				runtime.Gosched()
 				if rightOn {
 					jcs[1].SendRumble(rightGen()...)
 				} else {
 					jcs[1].SendRumble(rumbleOff...)
 				}
+				runtime.Gosched()
 				//t.Reset(d)
 			}
 		}

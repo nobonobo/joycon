@@ -1,9 +1,21 @@
 package joycon
 
-import "github.com/flynn/hid"
+import (
+	"fmt"
+
+	"github.com/flynn/hid"
+)
+
+type DeviceType int
+
+const (
+	JoyConL DeviceType = 0x2006
+	JoyConR DeviceType = 0x2007
+	ProCon  DeviceType = 0x2009
+)
 
 // Search ...
-func Search() ([]*hid.DeviceInfo, error) {
+func Search(dts ...DeviceType) ([]*hid.DeviceInfo, error) {
 	res := []*hid.DeviceInfo{}
 	devices, err := hid.Devices()
 	if err != nil {
@@ -17,8 +29,20 @@ func Search() ([]*hid.DeviceInfo, error) {
 		default:
 			continue
 		case 0x2006, 0x2007, 0x2009:
+			if len(dts) == 0 {
+				res = append(res, device)
+				continue
+			}
+			dt := DeviceType(device.ProductID)
+			for _, t := range dts {
+				if dt == t {
+					res = append(res, device)
+				}
+			}
 		}
-		res = append(res, device)
+	}
+	if len(res) == 0 {
+		return nil, fmt.Errorf("not found device")
 	}
 	return res, nil
 }

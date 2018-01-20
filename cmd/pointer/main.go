@@ -16,6 +16,20 @@ var (
 	oldButtons uint32
 	oldStick   joycon.Vec2
 	oldBattery int
+	rumbleData = []joycon.RumbleSet{
+		{
+			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // HiCoil
+			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // LoCoil
+		},
+		{
+			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // HiCoil
+			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // LoCoil
+		},
+		{
+			{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil
+			{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // LoCoil
+		},
+	}
 )
 
 func init() {
@@ -53,22 +67,13 @@ func (jc *Joycon) stateHandle(s joycon.State) {
 	case downButtons>>7&1 == 1: // ZR
 		keyboard.KeyDown(gotomation.VK_CONTROL)
 	case downButtons>>0&1 == 1: // Y
-		jc.Rumble([]byte{
-			0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x50,
-			0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40,
-		})
+		jc.SendRumble(rumbleData...)
 		mouse.ClickWith(gotomation.MouseLeft)
 	case downButtons>>1&1 == 1: // X
-		jc.Rumble([]byte{
-			0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x50,
-			0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40,
-		})
+		jc.SendRumble(rumbleData...)
 		mouse.ClickWith(gotomation.MouseCenter)
 	case downButtons>>2&1 == 1: // B
-		jc.Rumble([]byte{
-			0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x50,
-			0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40,
-		})
+		jc.SendRumble(rumbleData...)
 		mouse.ClickWith(gotomation.MouseRight)
 	case downButtons>>3&1 == 1: // A
 		keyboard.KeyDown(gotomation.VK_SPACE)
@@ -149,20 +154,17 @@ func (jc *Joycon) sensorHandle(s joycon.Sensor) {
 
 func main() {
 	log.SetFlags(log.Lmicroseconds)
-	devices, err := joycon.Search()
+	devices, err := joycon.Search(joycon.JoyConR)
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if len(devices) == 0 {
-		log.Fatalln("joycon not found")
-	}
-	log.Println("connected:", devices[0].Path)
 	j, err := joycon.NewJoycon(devices[0].Path)
 	if err != nil {
 		log.Fatalln(err)
 	}
 	defer j.Close()
 	jc := &Joycon{Joycon: j}
+	log.Println("connected:", jc.Name())
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
 
