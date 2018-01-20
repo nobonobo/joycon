@@ -48,29 +48,30 @@ type sub struct {
 
 // Joycon ...
 type Joycon struct {
-	info        *hid.DeviceInfo
-	closeOnce   sync.Once
-	device      hid.Device
-	rumble      chan []byte
-	sendRumble  chan<- []byte
-	report      chan []byte
-	state       chan State
-	sensor      chan Sensor
-	sub         chan sub
-	closing     chan struct{}
-	done        chan struct{}
-	count       byte
-	leftEnable  bool
-	rightEnable bool
-	leftStick   CalibInfo
-	rightStick  CalibInfo
-	stats       Stats
+	info         *hid.DeviceInfo
+	closeOnce    sync.Once
+	device       hid.Device
+	rumble       chan []byte
+	report       chan []byte
+	state        chan State
+	sensor       chan Sensor
+	sub          chan sub
+	closing      chan struct{}
+	done         chan struct{}
+	count        byte
+	leftEnable   bool
+	rightEnable  bool
+	leftStick    CalibInfo
+	rightStick   CalibInfo
+	stats        Stats
+	sendRumble   chan<- []byte
+	muSendRumble sync.RWMutex
 }
 
 // NewJoycon ...
 func NewJoycon(devicePath string) (*Joycon, error) {
 	jc := &Joycon{
-		rumble:  make(chan []byte, 3),
+		rumble:  make(chan []byte, 6),
 		report:  make(chan []byte, 16),
 		state:   make(chan State, 16),
 		sensor:  make(chan Sensor, 16),
@@ -114,12 +115,19 @@ func NewJoycon(devicePath string) (*Joycon, error) {
 	go jc.run()
 	return jc, nil
 }
+func (jc *Joycon) getSendRumble() chan<- []byte {
+	jc.muSendRumble.RLock()
+	defer jc.muSendRumble.RUnlock()
+	return jc.sendRumble
+}
 
 // Close ...
 func (jc *Joycon) Close() {
 	jc.closeOnce.Do(func() {
-		jc.sendRumble = nil
+		jc.muSendRumble.Lock()
 		close(jc.closing)
+		jc.sendRumble = nil
+		jc.muSendRumble.Unlock()
 		close(jc.rumble)
 		<-jc.done
 		jc.device.Close()
@@ -134,19 +142,6 @@ func (jc *Joycon) State() <-chan State {
 // Sensor ...
 func (jc *Joycon) Sensor() <-chan Sensor {
 	return jc.sensor
-}
-
-// Rumble ...
-func (jc *Joycon) Rumble(b []byte) {
-	for len(b) >= 8 {
-		select {
-		case <-jc.closing:
-			return
-		case jc.sendRumble <- b[:8]:
-		}
-		b = b[8:]
-	}
-	// truncate the remainder
 }
 
 // SendRumble ...
@@ -392,8 +387,9 @@ func (jc *Joycon) run() {
 	}()
 	// loop
 	t := time.NewTicker(time.Millisecond * 15)
+	t2 := time.NewTimer(time.Millisecond * 100)
+	r := []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 	for {
-		r := []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 		select {
 		case v := <-jc.sub:
 			if err := jc.subcommand(r, v.cmd); err != nil {
@@ -408,17 +404,17 @@ func (jc *Joycon) run() {
 			if !ok {
 				return
 			}
+			r = v
+			t2.Reset(time.Millisecond * 100)
 			atomic.AddUint64(&jc.stats.RumbleCount, 1)
-			if err := jc.subcommand(v, nil); err != nil {
+			if err := jc.subcommand(r, nil); err != nil {
 				log.Println(err)
 				jc.state <- State{Err: err}
 				return
 			}
+		case <-t2.C:
+			r = []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 		case <-t.C:
-			v, ok := <-jc.rumble
-			if ok {
-				r = v
-			}
 			if err := jc.subcommand(r, []byte{0}); err != nil {
 				log.Println(err)
 				jc.state <- State{Err: err}
