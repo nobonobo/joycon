@@ -92,22 +92,34 @@ type Sensor struct {
 	Accel Vec3
 }
 
-// SensorTri ...
-type SensorTri [3]Sensor
+// Sensors ...
+type Sensors [3]Sensor
 
 // UnmarshalBinary ...
-func (s *SensorTri) UnmarshalBinary(b []byte) error {
+func (s *Sensors) UnmarshalBinary(b []byte) error {
 	if len(b) < 49 {
 		return fmt.Errorf("invalid bytes length")
 	}
 	for n := 0; n < 3; n++ {
 		s[n].Tick = b[1] - byte(2-n)
-		s[n].Accel.X = AccelK * float32(int16(binary.LittleEndian.Uint16(b[13+n*12:15+n*12])))
-		s[n].Accel.Y = AccelK * float32(int16(binary.LittleEndian.Uint16(b[15+n*12:17+n*12])))
-		s[n].Accel.Z = AccelK * float32(int16(binary.LittleEndian.Uint16(b[17+n*12:19+n*12])))
-		s[n].Gyro.X = GyroK * float32(int16(binary.LittleEndian.Uint16(b[19+n*12:21+n*12])))
-		s[n].Gyro.Y = GyroK * float32(int16(binary.LittleEndian.Uint16(b[21+n*12:23+n*12])))
-		s[n].Gyro.Z = GyroK * float32(int16(binary.LittleEndian.Uint16(b[23+n*12:25+n*12])))
+		s[n].Accel.X = AccelK * float32(int16(
+			binary.LittleEndian.Uint16(b[13+n*12:15+n*12]),
+		))
+		s[n].Accel.Y = AccelK * float32(int16(
+			binary.LittleEndian.Uint16(b[15+n*12:17+n*12]),
+		))
+		s[n].Accel.Z = AccelK * float32(int16(
+			binary.LittleEndian.Uint16(b[17+n*12:19+n*12]),
+		))
+		s[n].Gyro.X = GyroK * float32(int16(
+			binary.LittleEndian.Uint16(b[19+n*12:21+n*12]),
+		))
+		s[n].Gyro.Y = GyroK * float32(int16(
+			binary.LittleEndian.Uint16(b[21+n*12:23+n*12]),
+		))
+		s[n].Gyro.Z = GyroK * float32(int16(
+			binary.LittleEndian.Uint16(b[23+n*12:25+n*12]),
+		))
 	}
 	return nil
 }
@@ -137,3 +149,30 @@ func (ci *CalibInfo) String() string {
 	return fmt.Sprintf("{%v %v %v}", ci.Center, max, min)
 }
 */
+
+// Rumble ...
+type Rumble struct {
+	HiFreq uint8 // 7bits normal 64
+	HiAmp  uint8 // 7bits normal 0
+	LoFreq uint8 // 7bits normal 64
+	LoAmp  uint8 // 7bits normal 0
+}
+
+// RumbleSet ...
+type RumbleSet [2]Rumble
+
+// MarshalBinary ...
+func (rs RumbleSet) MarshalBinary() ([]byte, error) {
+	res := make([]byte, 0, 8)
+	for i := 0; i < 2; i++ {
+		r := rs[i]
+		s := make([]byte, 4)
+		s[0] = (r.HiFreq & 0x3f) << 2
+		s[1] = (r.HiFreq>>6)&1 | (r.HiAmp&0x7f)<<1
+		amp := r.LoAmp + 0x80
+		s[2] = r.LoFreq&0x7f | (amp&1)<<7
+		s[3] = amp >> 1
+		res = append(res, s...)
+	}
+	return res, nil
+}
