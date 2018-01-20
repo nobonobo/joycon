@@ -15,7 +15,7 @@ import (
 )
 
 const (
-	Freq           = 48
+	Freq           = 64
 	Power          = 127
 	KEY_LEFT  uint = 65361
 	KEY_UP    uint = 65362
@@ -172,7 +172,7 @@ func main() {
 	leftGen := genRumble()
 	rightGen := genRumble()
 	go func() {
-		d := (5) * time.Millisecond
+		d := (15) * time.Millisecond
 		//t := time.NewTimer(d)
 		t := time.NewTicker(d)
 		t2 := time.NewTicker(1 * time.Second)

@@ -18,12 +18,8 @@ var (
 	oldBattery int
 	rumbleData = []joycon.RumbleSet{
 		{
-			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // HiCoil
-			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // LoCoil
-		},
-		{
-			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // HiCoil
-			{HiFreq: 64, HiAmp: 80, LoFreq: 64, LoAmp: 80}, // LoCoil
+			{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0},   // HiCoil
+			{HiFreq: 16, HiAmp: 80, LoFreq: 16, LoAmp: 80}, // LoCoil
 		},
 		{
 			{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil

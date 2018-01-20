@@ -66,18 +66,20 @@ type Joycon struct {
 	stats        Stats
 	sendRumble   chan<- []byte
 	muSendRumble sync.RWMutex
+	interval     *time.Ticker
 }
 
 // NewJoycon ...
 func NewJoycon(devicePath string) (*Joycon, error) {
 	jc := &Joycon{
-		rumble:  make(chan []byte, 6),
-		report:  make(chan []byte, 16),
-		state:   make(chan State, 16),
-		sensor:  make(chan Sensor, 16),
-		sub:     make(chan sub),
-		closing: make(chan struct{}),
-		done:    make(chan struct{}),
+		rumble:   make(chan []byte, 6),
+		report:   make(chan []byte, 16),
+		state:    make(chan State, 16),
+		sensor:   make(chan Sensor, 16),
+		sub:      make(chan sub),
+		closing:  make(chan struct{}),
+		done:     make(chan struct{}),
+		interval: time.NewTicker(5 * time.Millisecond),
 	}
 	jc.sendRumble = jc.rumble
 	info, err := hid.ByPath(devicePath)
@@ -115,11 +117,6 @@ func NewJoycon(devicePath string) (*Joycon, error) {
 	go jc.run()
 	return jc, nil
 }
-func (jc *Joycon) getSendRumble() chan<- []byte {
-	jc.muSendRumble.RLock()
-	defer jc.muSendRumble.RUnlock()
-	return jc.sendRumble
-}
 
 // Close ...
 func (jc *Joycon) Close() {
@@ -151,11 +148,13 @@ func (jc *Joycon) SendRumble(rs ...RumbleSet) error {
 		if err != nil {
 			return err
 		}
+		jc.muSendRumble.RLock()
 		select {
 		case <-jc.closing:
 			return io.EOF
 		case jc.sendRumble <- b:
 		}
+		jc.muSendRumble.RUnlock()
 	}
 	return nil
 }
@@ -200,6 +199,7 @@ func (jc *Joycon) Stats() Stats {
 }
 
 func (jc *Joycon) subcommand(rumble, cmd []byte) error {
+	defer func() { <-jc.interval.C }()
 	buf := make([]byte, 0x40)
 	if len(cmd) == 0 {
 		buf[0] = 0x10
@@ -387,7 +387,7 @@ func (jc *Joycon) run() {
 	}()
 	// loop
 	t := time.NewTicker(time.Millisecond * 15)
-	t2 := time.NewTimer(time.Millisecond * 100)
+	t2 := time.NewTimer(time.Millisecond * 120)
 	r := []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 	for {
 		select {
@@ -405,16 +405,24 @@ func (jc *Joycon) run() {
 				return
 			}
 			r = v
-			t2.Reset(time.Millisecond * 100)
 			atomic.AddUint64(&jc.stats.RumbleCount, 1)
 			if err := jc.subcommand(r, nil); err != nil {
 				log.Println(err)
 				jc.state <- State{Err: err}
 				return
 			}
+			t2.Reset(time.Millisecond * 120)
 		case <-t2.C:
 			r = []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 		case <-t.C:
+			select {
+			default:
+			case v, ok := <-jc.rumble:
+				if !ok {
+					return
+				}
+				r = v
+			}
 			if err := jc.subcommand(r, []byte{0}); err != nil {
 				log.Println(err)
 				jc.state <- State{Err: err}
