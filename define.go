@@ -162,7 +162,7 @@ type Rumble struct {
 type RumbleSet [2]Rumble
 
 // MarshalBinary ...
-func (rs *RumbleSet) MarshalBinary() ([]byte, error) {
+func (rs RumbleSet) MarshalBinary() ([]byte, error) {
 	res := make([]byte, 0, 8)
 	for i := 0; i < 2; i++ {
 		r := rs[i]

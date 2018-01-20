@@ -5,6 +5,8 @@ package joycon
 import (
 	"bytes"
 	"fmt"
+	"io"
+	"log"
 	"math"
 	"sync"
 	"sync/atomic"
@@ -39,15 +41,23 @@ type Stats struct {
 	StateCount  uint64
 }
 
+type sub struct {
+	cmd []byte
+	rep chan<- []byte
+}
+
 // Joycon ...
 type Joycon struct {
 	info        *hid.DeviceInfo
 	closeOnce   sync.Once
 	device      hid.Device
 	rumble      chan []byte
+	sendRumble  chan<- []byte
 	report      chan []byte
 	state       chan State
 	sensor      chan Sensor
+	sub         chan sub
+	closing     chan struct{}
 	done        chan struct{}
 	count       byte
 	leftEnable  bool
@@ -60,12 +70,15 @@ type Joycon struct {
 // NewJoycon ...
 func NewJoycon(devicePath string) (*Joycon, error) {
 	jc := &Joycon{
-		rumble: make(chan []byte, 3),
-		report: make(chan []byte, 16),
-		state:  make(chan State, 16),
-		sensor: make(chan Sensor, 16),
-		done:   make(chan struct{}),
+		rumble:  make(chan []byte, 3),
+		report:  make(chan []byte, 16),
+		state:   make(chan State, 16),
+		sensor:  make(chan Sensor, 16),
+		sub:     make(chan sub),
+		closing: make(chan struct{}),
+		done:    make(chan struct{}),
 	}
+	jc.sendRumble = jc.rumble
 	info, err := hid.ByPath(devicePath)
 	if err != nil {
 		return nil, err
@@ -77,6 +90,27 @@ func NewJoycon(devicePath string) (*Joycon, error) {
 	}
 	jc.device = device
 	go jc.receive()
+	if err := jc.subcommand(nil, []byte{0x03, 0x3f}); err != nil {
+		return nil, err
+	}
+	if _, err := jc.reply(); err != nil {
+		return nil, err
+	}
+	data, err := jc.ReadSPI(0x6012, 1)
+	if err != nil {
+		return nil, err
+	}
+	switch data[0] {
+	case 0x01:
+		jc.leftEnable = true
+	case 0x02:
+		jc.rightEnable = true
+	case 0x03:
+		jc.leftEnable = true
+		jc.rightEnable = true
+	default:
+		return nil, fmt.Errorf("unknown product type: %d", data[0])
+	}
 	go jc.run()
 	return jc, nil
 }
@@ -84,6 +118,8 @@ func NewJoycon(devicePath string) (*Joycon, error) {
 // Close ...
 func (jc *Joycon) Close() {
 	jc.closeOnce.Do(func() {
+		jc.sendRumble = nil
+		close(jc.closing)
 		close(jc.rumble)
 		<-jc.done
 		jc.device.Close()
@@ -103,7 +139,11 @@ func (jc *Joycon) Sensor() <-chan Sensor {
 // Rumble ...
 func (jc *Joycon) Rumble(b []byte) {
 	for len(b) >= 8 {
-		jc.rumble <- b[:8]
+		select {
+		case <-jc.closing:
+			return
+		case jc.sendRumble <- b[:8]:
+		}
 		b = b[8:]
 	}
 	// truncate the remainder
@@ -116,7 +156,11 @@ func (jc *Joycon) SendRumble(rs ...RumbleSet) error {
 		if err != nil {
 			return err
 		}
-		jc.rumble <- b
+		select {
+		case <-jc.closing:
+			return io.EOF
+		case jc.sendRumble <- b:
+		}
 	}
 	return nil
 }
@@ -223,6 +267,8 @@ func (jc *Joycon) receive() {
 					}
 				}
 				continue
+			case 0x11:
+				// IR data
 			case 0x3f:
 			case 0x31, 0x32, 0x33:
 			case 0x21:
@@ -251,33 +297,8 @@ func (jc *Joycon) receive() {
 
 func (jc *Joycon) run() {
 	defer close(jc.done)
-	if err := jc.subcommand(nil, []byte{0x03, 0x3f}); err != nil {
-		jc.state <- State{Err: err}
-		return
-	}
-	if _, err := jc.reply(); err != nil {
-		jc.state <- State{Err: err}
-		return
-	}
-	data, err := jc.ReadSPI(0x6012, 1)
-	if err != nil {
-		jc.state <- State{Err: err}
-		return
-	}
-	switch data[0] {
-	case 0x01:
-		jc.leftEnable = true
-	case 0x02:
-		jc.rightEnable = true
-	case 0x03:
-		jc.leftEnable = true
-		jc.rightEnable = true
-	default:
-		jc.state <- State{Err: fmt.Errorf("unknown product type: %d", data[0])}
-		return
-	}
 	if jc.leftEnable {
-		data, err = jc.ReadSPI(0x8012, 9)
+		data, err := jc.ReadSPI(0x8012, 9)
 		if err != nil {
 			jc.state <- State{Err: err}
 			return
@@ -297,7 +318,7 @@ func (jc *Joycon) run() {
 		}
 	}
 	if jc.rightEnable {
-		data, err = jc.ReadSPI(0x801d, 9)
+		data, err := jc.ReadSPI(0x801d, 9)
 		if err != nil {
 			jc.state <- State{Err: err}
 			return
@@ -324,25 +345,25 @@ func (jc *Joycon) run() {
 		}
 	}
 	// LeftStick Deadzone
-	data, err = jc.ReadSPI(0x6086, 16)
+	_, err := jc.ReadSPI(0x6086, 16)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
 	// RightStick Deadzone
-	data, err = jc.ReadSPI(0x6098, 16)
+	_, err = jc.ReadSPI(0x6098, 16)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
 	// Gyro Parameters (user)
-	data, err = jc.ReadSPI(0x8034, 10)
+	_, err = jc.ReadSPI(0x8034, 10)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
 	}
 	// Gyro Parameters (sys)
-	data, err = jc.ReadSPI(0x6029, 10)
+	_, err = jc.ReadSPI(0x6029, 10)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return
@@ -370,33 +391,41 @@ func (jc *Joycon) run() {
 		}
 	}()
 	// loop
-	n := 0
-	t := time.NewTicker(time.Millisecond * 5)
+	t := time.NewTicker(time.Millisecond * 15)
 	for {
-		n = (n + 1) % 3
-		<-t.C
 		r := []byte{0x00, 0x01, 0x40, 0x40, 0x00, 0x01, 0x40, 0x40}
 		select {
+		case v := <-jc.sub:
+			if err := jc.subcommand(r, v.cmd); err != nil {
+				v.rep <- nil
+			}
+			b, err := jc.reply()
+			if err != nil {
+				v.rep <- nil
+			}
+			v.rep <- b
 		case v, ok := <-jc.rumble:
 			if !ok {
 				return
 			}
 			atomic.AddUint64(&jc.stats.RumbleCount, 1)
-			r = v
-			if n != 0 {
-				if err := jc.subcommand(r, nil); err != nil {
-					jc.state <- State{Err: err}
-					return
-				}
-				continue
+			if err := jc.subcommand(v, nil); err != nil {
+				log.Println(err)
+				jc.state <- State{Err: err}
+				return
 			}
-		default:
+		case <-t.C:
+			v, ok := <-jc.rumble
+			if ok {
+				r = v
+			}
+			if err := jc.subcommand(r, []byte{0}); err != nil {
+				log.Println(err)
+				jc.state <- State{Err: err}
+				return
+			}
+			jc.reply()
 		}
-		if err := jc.subcommand(r, []byte{0}); err != nil {
-			jc.state <- State{Err: err}
-			return
-		}
-		jc.reply()
 	}
 }
 

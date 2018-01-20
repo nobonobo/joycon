@@ -15,45 +15,30 @@ import (
 )
 
 const (
-	LeftPower       = 127
-	RightPower      = 127
-	KEY_LEFT   uint = 65361
-	KEY_UP     uint = 65362
-	KEY_RIGHT  uint = 65363
-	KEY_DOWN   uint = 65364
+	Freq           = 48
+	Power          = 127
+	KEY_LEFT  uint = 65361
+	KEY_UP    uint = 65362
+	KEY_RIGHT uint = 65363
+	KEY_DOWN  uint = 65364
 )
 
-var (
-	vibrationForLeft = []joycon.RumbleSet{
-		/*
+func genRumble() func() []joycon.RumbleSet {
+	return func() []joycon.RumbleSet {
+		return []joycon.RumbleSet{
 			{
-				{HiFreq: 62, HiAmp: LeftPower, LoFreq: 62, LoAmp: LeftPower}, // HiCoil
-				{HiFreq: 66, HiAmp: LeftPower, LoFreq: 66, LoAmp: LeftPower}, // LoCoil
+				{HiFreq: Freq, HiAmp: Power, LoFreq: Freq, LoAmp: Power}, // HiCoil
+				{HiFreq: Freq, HiAmp: Power, LoFreq: Freq, LoAmp: Power}, // LoCoil
 			},
-			{
-				{HiFreq: 63, HiAmp: LeftPower, LoFreq: 63, LoAmp: LeftPower}, // HiCoil
-				{HiFreq: 65, HiAmp: LeftPower, LoFreq: 65, LoAmp: LeftPower}, // LoCoil
-			},
-		*/
-		{
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // HiCoil
-			{HiFreq: 64, HiAmp: LeftPower, LoFreq: 64, LoAmp: LeftPower}, // LoCoil
-		},
+		}
 	}
-	vibrationForRight = []joycon.RumbleSet{
-		/*
-			{
-				{HiFreq: 62, HiAmp: RightPower, LoFreq: 62, LoAmp: RightPower}, // HiCoil
-				{HiFreq: 66, HiAmp: RightPower, LoFreq: 66, LoAmp: RightPower}, // LoCoil
-			},
-			{
-				{HiFreq: 63, HiAmp: RightPower, LoFreq: 63, LoAmp: RightPower}, // HiCoil
-				{HiFreq: 65, HiAmp: RightPower, LoFreq: 65, LoAmp: RightPower}, // LoCoil
-			},
-		*/
+}
+
+var (
+	rumbleOff = []joycon.RumbleSet{
 		{
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // HiCoil
-			{HiFreq: 64, HiAmp: RightPower, LoFreq: 64, LoAmp: RightPower}, // LoCoil
+			{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // HiCoil
+			{HiFreq: 64, HiAmp: 0, LoFreq: 64, LoAmp: 0}, // LoCoil
 		},
 	}
 )
@@ -182,21 +167,32 @@ func main() {
 		log.Println("right released")
 		rightOn = false
 	})
+	leftGen := genRumble()
+	rightGen := genRumble()
 	go func() {
-		d := 1 * time.Millisecond
-		t := time.NewTimer(d)
+		d := (15) * time.Millisecond
+		//t := time.NewTimer(d)
+		t := time.NewTicker(d)
+		t2 := time.NewTicker(1 * time.Second)
 		for {
 			select {
 			case <-done:
 				return
+			case <-t2.C:
+				log.Println(jcs[0].Stats())
+				log.Println(jcs[1].Stats())
 			case <-t.C:
 				if leftOn {
-					jcs[0].SendRumble(vibrationForLeft...)
+					jcs[0].SendRumble(leftGen()...)
+				} else {
+					jcs[0].SendRumble(rumbleOff...)
 				}
 				if rightOn {
-					jcs[1].SendRumble(vibrationForRight...)
+					jcs[1].SendRumble(rightGen()...)
+				} else {
+					jcs[1].SendRumble(rumbleOff...)
 				}
-				t.Reset(d)
+				//t.Reset(d)
 			}
 		}
 	}()
