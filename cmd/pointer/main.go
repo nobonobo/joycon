@@ -139,12 +139,12 @@ func (jc *Joycon) apply() {
 
 func (jc *Joycon) sensorHandle(s joycon.Sensor) {
 	if jc.IsLeft() || jc.IsProCon() {
-		jc.dx -= int(s.Gyro.Z * 200)
-		jc.dy += int(s.Gyro.Y * 200)
+		jc.dx -= int(s.Gyro.Z * 100)
+		jc.dy += int(s.Gyro.Y * 100)
 	}
 	if jc.IsRight() {
-		jc.dx += int(s.Gyro.Z * 200)
-		jc.dy -= int(s.Gyro.Y * 200)
+		jc.dx += int(s.Gyro.Z * 100)
+		jc.dy -= int(s.Gyro.Y * 100)
 	}
 }
 
@@ -154,7 +154,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	j, err := joycon.NewJoycon(devices[0].Path)
+	j, err := joycon.NewJoycon(devices[0].Path, false)
 	if err != nil {
 		log.Fatalln(err)
 	}

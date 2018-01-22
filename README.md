@@ -32,14 +32,11 @@ package main
 import "github.com/nobonobo/joycon"
 
 func main() {
-    devices, err := joycon.Search()
+    devices, err := joycon.Search(joycon.JoyConL)
     if err != nil {
         log.Fatalln(err)
     }
-    if len(devices) == 0 {
-        log.Fatalln("joycon not found")
-    }
-    jc, err := joycon.NewJoycon(devices[0].Path)
+    jc, err := joycon.NewJoycon(devices[0].Path, false)
     if err != nil {
         log.Fatalln(err)
     }
@@ -57,8 +54,8 @@ func main() {
 ## TODO
 
 - [ ] Deadzone parameter read from SPI memory. 
-- [ ] Rich Vibration support.
+- [x] Rich Vibration support.
 - [ ] Set Player LED.
 - [ ] Set HomeButton LED.
 - [ ] Low power mode support.
-- [ ] IR sensor capture.
+- [ ] IR sensor capture.(wip)

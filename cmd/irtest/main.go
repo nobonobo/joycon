@@ -15,7 +15,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	jc, err := joycon.NewJoycon(devices[0].Path)
+	jc, err := joycon.NewJoycon(devices[0].Path, true)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -23,26 +23,11 @@ func main() {
 	defer jc.Close()
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt)
-	time.Sleep(500 * time.Millisecond)
-	rep, err := jc.Subcommand([]byte{0x03, 0x02})
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("ir report mode0: %X", rep)
-	rep, err = jc.Subcommand([]byte{0x03, 0x31})
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("change ir-mode: %X", rep)
-	rep, err = jc.Subcommand([]byte{0x11})
-	if err != nil {
-		log.Fatalln(err)
-	}
-	log.Printf("send 11?: %X", rep)
 	t := time.NewTicker(1 * time.Second)
 	for {
 		select {
 		case <-sig:
+			log.Println("signal received")
 			return
 		case <-t.C:
 			log.Println(jc.Stats())

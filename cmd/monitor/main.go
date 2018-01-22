@@ -30,7 +30,7 @@ func main() {
 	}
 	jcs := []*joycon.Joycon{}
 	for _, dev := range devices {
-		jc, err := joycon.NewJoycon(dev.Path)
+		jc, err := joycon.NewJoycon(dev.Path, false)
 		if err != nil {
 			log.Fatalln(err)
 		}
