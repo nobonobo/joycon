@@ -5,6 +5,7 @@ package joycon
 import (
 	"bytes"
 	"fmt"
+	"image/color"
 	"io"
 	"log"
 	"math"
@@ -34,13 +35,6 @@ var (
 	}
 )
 
-// Stats ...
-type Stats struct {
-	RumbleCount uint64
-	SensorCount uint64
-	StateCount  uint64
-}
-
 type sub struct {
 	cmd []byte
 	rep chan<- []byte
@@ -55,9 +49,11 @@ type Joycon struct {
 	report       chan []byte
 	state        chan State
 	sensor       chan Sensor
+	irdata       chan IRData
 	sub          chan sub
 	closing      chan struct{}
 	done         chan struct{}
+	color        color.Color
 	count        byte
 	leftEnable   bool
 	rightEnable  bool
@@ -76,6 +72,7 @@ func NewJoycon(devicePath string) (*Joycon, error) {
 		report:   make(chan []byte, 16),
 		state:    make(chan State, 16),
 		sensor:   make(chan Sensor, 16),
+		irdata:   make(chan IRData, 16),
 		sub:      make(chan sub),
 		closing:  make(chan struct{}),
 		done:     make(chan struct{}),
@@ -141,6 +138,25 @@ func (jc *Joycon) Sensor() <-chan Sensor {
 	return jc.sensor
 }
 
+// IRData ...
+func (jc *Joycon) IRData() <-chan IRData {
+	return jc.irdata
+}
+
+// Subcommand ...
+func (jc *Joycon) Subcommand(b []byte) ([]byte, error) {
+	ch := make(chan []byte, 1)
+	jc.sub <- sub{
+		cmd: b,
+		rep: ch,
+	}
+	rep, ok := <-ch
+	if !ok {
+		return nil, fmt.Errorf("reply receive failed")
+	}
+	return rep, nil
+}
+
 // SendRumble ...
 func (jc *Joycon) SendRumble(rs ...RumbleSet) error {
 	for _, r := range rs {
@@ -194,6 +210,7 @@ func (jc *Joycon) Stats() Stats {
 	return Stats{
 		RumbleCount: atomic.LoadUint64(&jc.stats.RumbleCount),
 		SensorCount: atomic.LoadUint64(&jc.stats.SensorCount),
+		IRDataCount: atomic.LoadUint64(&jc.stats.IRDataCount),
 		StateCount:  atomic.LoadUint64(&jc.stats.StateCount),
 	}
 }
@@ -206,7 +223,7 @@ func (jc *Joycon) subcommand(rumble, cmd []byte) error {
 	} else {
 		buf[0] = 0x01
 	}
-	buf[2] = jc.count
+	buf[1] = jc.count
 	copy(buf[2:10], rumble)
 	copy(buf[10:], cmd)
 	jc.count = (jc.count + 1) & 15
@@ -249,7 +266,8 @@ func (jc *Joycon) receive() {
 				return
 			}
 			switch rep[0] {
-			case 0x30: // gyro & accel
+			case 0x30:
+				// gyro & accel
 				s := Sensors{}
 				if err := s.UnmarshalBinary(rep); err != nil {
 					return
@@ -262,10 +280,23 @@ func (jc *Joycon) receive() {
 					}
 				}
 				continue
-			case 0x11:
+			case 0x31:
 				// IR data
+				data := IRData{}
+				if err := data.UnmarshalBinary(rep[49:362]); err != nil {
+					log.Println(err)
+					return
+				}
+				atomic.AddUint64(&jc.stats.IRDataCount, 1)
+				select {
+				case jc.irdata <- data:
+				default:
+				}
+				continue
 			case 0x3f:
-			case 0x31, 0x32, 0x33:
+				log.Println("")
+			case 0x32, 0x33:
+				log.Printf("rep: %X", rep)
 			case 0x21:
 				s := &State{}
 				if err := s.UnmarshalBinary(rep); err == nil {
@@ -312,6 +343,12 @@ func (jc *Joycon) run() {
 			}
 		}
 	}
+	data, err := jc.ReadSPI(0x6050, 3)
+	if err != nil {
+		jc.state <- State{Err: err}
+		return
+	}
+	jc.color = color.RGBA{data[0], data[1], data[2], 0}
 	if jc.rightEnable {
 		data, err := jc.ReadSPI(0x801d, 9)
 		if err != nil {
@@ -340,7 +377,7 @@ func (jc *Joycon) run() {
 		}
 	}
 	// LeftStick Deadzone
-	_, err := jc.ReadSPI(0x6086, 16)
+	_, err = jc.ReadSPI(0x6086, 16)
 	if err != nil {
 		jc.state <- State{Err: err}
 		return

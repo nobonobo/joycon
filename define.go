@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/binary"
 	"fmt"
+	"log"
 )
 
 const (
@@ -175,4 +176,22 @@ func (rs RumbleSet) MarshalBinary() ([]byte, error) {
 		res = append(res, s...)
 	}
 	return res, nil
+}
+
+// IRData ...
+type IRData struct {
+}
+
+// UnmarshalBinary ...
+func (ir *IRData) UnmarshalBinary(b []byte) error {
+	log.Printf("IR(%d):%X", len(b), b)
+	return nil
+}
+
+// Stats ...
+type Stats struct {
+	RumbleCount uint64
+	SensorCount uint64
+	IRDataCount uint64
+	StateCount  uint64
 }

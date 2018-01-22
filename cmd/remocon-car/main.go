@@ -53,9 +53,6 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if len(devices) == 0 {
-		log.Fatalln("joycon not found")
-	}
 	jcs := []*joycon.Joycon{}
 	for _, dev := range devices {
 		jc, err := joycon.NewJoycon(dev.Path)
@@ -65,7 +62,7 @@ func main() {
 		log.Println(dev.Path, jc.Name())
 		jcs = append(jcs, jc)
 	}
-	if jcs[0].Name() == "Joy-Con (R)" {
+	if jcs[0].IsRight() {
 		jcs[0], jcs[1] = jcs[1], jcs[0]
 	}
 	defer func() {

@@ -23,13 +23,10 @@ func calc(v float32) int {
 }
 
 func main() {
-	log.SetFlags(log.Lmicroseconds)
+	log.SetFlags(log.Lmicroseconds | log.Lshortfile)
 	devices, err := joycon.Search()
 	if err != nil {
 		log.Fatalln(err)
-	}
-	if len(devices) == 0 {
-		log.Fatalln("joycon not found")
 	}
 	jcs := []*joycon.Joycon{}
 	for _, dev := range devices {
