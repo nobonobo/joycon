@@ -18,9 +18,11 @@ import (
 
 var (
 	connectSeq = [][]byte{
-		{0x01, 0x01}, // Connect1
-		{0x01, 0x02}, // Connect2
-		{0x01, 0x03}, // Connect3
+		/*
+			{0x01, 0x01}, // Connect1
+			{0x01, 0x02}, // Connect2
+			{0x01, 0x03}, // Connect3
+		*/
 		{0x30, 0x01}, // Set PlayerLED
 		{0x40, 0x01}, // Enable 6axis Sensor
 		{0x48, 0x01}, // Enable Vibration
@@ -50,6 +52,8 @@ type Joycon struct {
 	state        chan State
 	sensor       chan Sensor
 	irdata       chan IRData
+	irenable     bool
+	outputcode   byte
 	sub          chan sub
 	closing      chan struct{}
 	done         chan struct{}
@@ -66,17 +70,19 @@ type Joycon struct {
 }
 
 // NewJoycon ...
-func NewJoycon(devicePath string) (*Joycon, error) {
+func NewJoycon(devicePath string, irenable bool) (*Joycon, error) {
 	jc := &Joycon{
-		rumble:   make(chan []byte, 6),
-		report:   make(chan []byte, 16),
-		state:    make(chan State, 16),
-		sensor:   make(chan Sensor, 16),
-		irdata:   make(chan IRData, 16),
-		sub:      make(chan sub),
-		closing:  make(chan struct{}),
-		done:     make(chan struct{}),
-		interval: time.NewTicker(5 * time.Millisecond),
+		rumble:     make(chan []byte, 6),
+		report:     make(chan []byte, 16),
+		state:      make(chan State, 16),
+		sensor:     make(chan Sensor, 16),
+		irdata:     make(chan IRData, 16),
+		irenable:   irenable,
+		outputcode: 0x01,
+		sub:        make(chan sub),
+		closing:    make(chan struct{}),
+		done:       make(chan struct{}),
+		interval:   time.NewTicker(5 * time.Millisecond),
 	}
 	jc.sendRumble = jc.rumble
 	info, err := hid.ByPath(devicePath)
@@ -217,11 +223,11 @@ func (jc *Joycon) Stats() Stats {
 
 func (jc *Joycon) subcommand(rumble, cmd []byte) error {
 	defer func() { <-jc.interval.C }()
-	buf := make([]byte, 0x40)
+	buf := make([]byte, jc.info.OutputReportLength)
 	if len(cmd) == 0 {
 		buf[0] = 0x10
 	} else {
-		buf[0] = 0x01
+		buf[0] = jc.outputcode
 	}
 	buf[1] = jc.count
 	copy(buf[2:10], rumble)
@@ -422,6 +428,58 @@ func (jc *Joycon) run() {
 			}
 		}
 	}()
+	if jc.irenable {
+		if err := jc.subcommand(nil, []byte{0x40, 0x00}); err != nil {
+			jc.state <- State{Err: err}
+			return
+		}
+		r, err := jc.reply()
+		if err != nil {
+			log.Println(err)
+			jc.state <- State{Err: err}
+			return
+		}
+		log.Printf("r:%X", r)
+		if err := jc.subcommand(nil, []byte{0x03, 0x31}); err != nil {
+			jc.state <- State{Err: err}
+			return
+		}
+		r, err = jc.reply()
+		if err != nil {
+			log.Println(err)
+			jc.state <- State{Err: err}
+			return
+		}
+		log.Printf("r:%X", r)
+		if err := jc.subcommand(nil, []byte{0x11, 0x03, 0x00}); err != nil {
+			log.Println(err)
+			jc.state <- State{Err: err}
+			return
+		}
+		r, err = jc.reply()
+		if err != nil {
+			log.Println(err)
+			jc.state <- State{Err: err}
+			return
+		}
+		log.Printf("r:%X", r)
+		jc.outputcode = 0x11
+		if err := jc.subcommand(nil, []byte{0x03, 0x00}); err != nil {
+			log.Println(err)
+			jc.state <- State{Err: err}
+			return
+		}
+		/*
+			r, err = jc.reply()
+			if err != nil {
+				log.Println(err)
+				jc.state <- State{Err: err}
+				return
+			}
+			log.Printf("r:%X", r)
+		*/
+		jc.outputcode = 0x1
+	}
 	// loop
 	t := time.NewTicker(time.Millisecond * 15)
 	t2 := time.NewTimer(time.Millisecond * 120)

@@ -12,10 +12,7 @@ func main() {
 	if err != nil {
 		log.Fatalln(err)
 	}
-	if len(devices) == 0 {
-		log.Fatalln("joycon not found")
-	}
-	jc, err := joycon.NewJoycon(devices[0].Path)
+	jc, err := joycon.NewJoycon(devices[0].Path, false)
 	if err != nil {
 		log.Fatalln(err)
 	}
