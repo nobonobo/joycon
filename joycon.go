@@ -223,7 +223,7 @@ func (jc *Joycon) Stats() Stats {
 
 func (jc *Joycon) subcommand(rumble, cmd []byte) error {
 	defer func() { <-jc.interval.C }()
-	buf := make([]byte, 0x40)
+	buf := make([]byte, jc.info.OutputReportLength)
 	if len(cmd) == 0 {
 		buf[0] = 0x10
 	} else {
