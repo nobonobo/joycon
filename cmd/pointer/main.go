@@ -4,16 +4,12 @@ import (
 	"log"
 	"os"
 	"os/signal"
-	"time"
 
+	"github.com/go-vgo/robotgo"
 	"github.com/nobonobo/joycon"
-	"github.com/shibukawa/gotomation"
 )
 
 var (
-	mouse      gotomation.Mouse
-	keyboard   gotomation.Keyboard
-	screen     *gotomation.Screen
 	oldButtons uint32
 	oldStick   joycon.Vec2
 	oldBattery int
@@ -28,16 +24,6 @@ var (
 		},
 	}
 )
-
-func init() {
-	s, err := gotomation.GetMainScreen()
-	if err != nil {
-		log.Fatalln(err)
-	}
-	screen = s
-	mouse = screen.Mouse()
-	keyboard = screen.Keyboard()
-}
 
 // Joycon ...
 type Joycon struct {
@@ -64,28 +50,26 @@ func (jc *Joycon) stateHandle(s joycon.State) {
 	default:
 		log.Printf("down: %06X", downButtons)
 	case downButtons>>6&1 == 1: // R
-		//keyboard.KeyDown(gotomation.VK_SHIFT)
 		jc.stop = true
 	case downButtons>>7&1 == 1: // ZR
-		//keyboard.KeyDown(gotomation.VK_CONTROL)
 		jc.scroll = true
 	case downButtons>>0&1 == 1: // Y
 		jc.SendRumble(rumbleData...)
-		mouse.ClickWith(gotomation.MouseLeft)
+		robotgo.MouseClick("left")
 	case downButtons>>1&1 == 1: // X
 		jc.SendRumble(rumbleData...)
-		mouse.ClickWith(gotomation.MouseCenter)
+		robotgo.MouseClick("center")
 	case downButtons>>3&1 == 1: // A
 		jc.SendRumble(rumbleData...)
-		mouse.ClickWith(gotomation.MouseRight)
+		robotgo.MouseClick("right")
 	case downButtons>>2&1 == 1: // B
-		keyboard.KeyDown(gotomation.VK_SPACE)
+		robotgo.KeyTap("space")
 	case downButtons>>4&1 == 1: // SR
-		mouse.Scroll(-2, 0, 30*time.Millisecond)
+		robotgo.Scroll(0, -2)
 	case downButtons>>5&1 == 1: // SL
-		mouse.Scroll(+2, 0, 30*time.Millisecond)
+		robotgo.Scroll(0, +2)
 	case downButtons>>9&1 == 1: // +
-		keyboard.KeyDown(gotomation.VK_ESCAPE)
+		robotgo.KeyTap("escape")
 	case downButtons>>10&1 == 1: // RStick Push
 	case downButtons>>12&1 == 1: // Home
 	}
@@ -94,20 +78,16 @@ func (jc *Joycon) stateHandle(s joycon.State) {
 	default:
 		log.Printf("up  : %06X", upButtons)
 	case upButtons>>6&1 == 1: // R
-		//keyboard.KeyUp(gotomation.VK_SHIFT)
 		jc.stop = false
 	case upButtons>>7&1 == 1: // ZR
-		//keyboard.KeyUp(gotomation.VK_CONTROL)
 		jc.scroll = false
 	case upButtons>>0&1 == 1: // Y
 	case upButtons>>1&1 == 1: // X
 	case upButtons>>2&1 == 1: // B
 	case upButtons>>3&1 == 1: // A
-		keyboard.KeyUp(gotomation.VK_SPACE)
 	case upButtons>>4&1 == 1: // SR
 	case upButtons>>5&1 == 1: // SL
 	case upButtons>>9&1 == 1: // +
-		keyboard.KeyUp(gotomation.VK_ESCAPE)
 	case upButtons>>10&1 == 1: // RStick Push
 	case upButtons>>12&1 == 1: // Home
 	}
@@ -115,53 +95,50 @@ func (jc *Joycon) stateHandle(s joycon.State) {
 		jc.scrollPos += s.RightAdj.Y * s.RightAdj.Y * s.RightAdj.Y
 		d := -int(jc.scrollPos)
 		jc.scrollPos += float32(d)
-		mouse.Scroll(d, 0, 20*time.Millisecond)
+		robotgo.Scroll(0, d)
 	} else {
 		switch {
 		case s.RightAdj.X > 0.5 && oldStick.X < 0.5:
-			keyboard.KeyDown(gotomation.VK_RIGHT)
+			robotgo.KeyTap("right")
 		case s.RightAdj.X < 0.5 && oldStick.X > 0.5:
-			keyboard.KeyUp(gotomation.VK_RIGHT)
 		}
 		switch {
 		case s.RightAdj.X < -0.5 && oldStick.X > -0.5:
-			keyboard.KeyDown(gotomation.VK_LEFT)
+			robotgo.KeyTap("left")
 		case s.RightAdj.X > -0.5 && oldStick.X < -0.5:
-			keyboard.KeyUp(gotomation.VK_LEFT)
 		}
 		switch {
 		case s.RightAdj.Y > 0.5 && oldStick.Y < 0.5:
-			keyboard.KeyDown(gotomation.VK_UP)
+			robotgo.KeyTap("up")
 		case s.RightAdj.Y < 0.5 && oldStick.Y > 0.5:
-			keyboard.KeyUp(gotomation.VK_UP)
 		}
 		switch {
 		case s.RightAdj.Y < -0.5 && oldStick.Y > -0.5:
-			keyboard.KeyDown(gotomation.VK_DOWN)
+			robotgo.KeyTap("down")
 		case s.RightAdj.Y > -0.5 && oldStick.Y < -0.5:
-			keyboard.KeyUp(gotomation.VK_DOWN)
 		}
 	}
 }
 
 func (jc *Joycon) apply() {
 	if (jc.dx != 0 || jc.dy != 0) && !jc.stop {
-		x, y := mouse.GetPosition()
+		x, y := robotgo.GetMousePos()
+		w, h := robotgo.GetScreenSize()
 		x += int(jc.dx)
 		y += int(jc.dy)
-		if x >= screen.W() {
-			x = screen.W()
+		if x >= w {
+			x = w
 		}
 		if x < 0 {
 			x = 0
 		}
-		if y >= screen.H() {
-			y = screen.H()
+		if y >= h {
+			y = h
 		}
 		if y < 0 {
 			y = 0
 		}
-		mouse.MoveQuickly(x, y)
+		robotgo.MoveMouse(x, y)
 		jc.dx = 0
 		jc.dy = 0
 	}
